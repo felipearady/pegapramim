@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>EncomendaFácil</title>
+  <title>Encomenda Fácil</title>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <style>
@@ -133,10 +133,14 @@
   <div class="screen active" id="screen-login">
     <div class="landing">
       <div class="logo">📦</div>
-      <h1>EncomendaFácil</h1>
+      <h1>Encomenda Fácil</h1>
       <p>Sistema de recebimento de encomendas entre vizinhos do condomínio.</p>
       <div class="field"><label>Seu nome completo</label><input id="l-nome" placeholder="Ex: Maria Silva" /></div>
       <div class="field"><label>Número do apartamento</label><input id="l-apto" placeholder="Ex: 302" /></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <input type="checkbox" id="l-lembrar" style="width:16px;height:16px;cursor:pointer;" checked />
+        <label for="l-lembrar" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Lembrar de mim neste aparelho</label>
+      </div>
       <button class="btn btn-primary" onclick="entrar()">Entrar →</button>
       <button class="btn btn-secondary" onclick="goScreen('screen-cadastro')">Faça seu cadastro</button>
       <p style="text-align:center;margin-top:8px;"><button class="btn-link" style="font-size:12px;color:var(--text-hint);" onclick="goScreen('screen-admin-login')">Acesso administrador</button></p>
@@ -148,10 +152,9 @@
     <div class="landing">
       <div class="logo">🏠</div>
       <h1 style="font-size:20px;">Criar cadastro</h1>
-      <p>Preencha seus dados para participar do EncomendaFácil do seu condomínio.</p>
+      <p>Preencha seus dados para participar do Encomenda Fácil do seu condomínio.</p>
       <div class="field"><label>Seu nome completo</label><input id="reg-nome" placeholder="Ex: Maria Silva" /></div>
       <div class="field"><label>Número do apartamento</label><input id="reg-apto" placeholder="Ex: 302" /></div>
-      <div class="field"><label>Telefone (WhatsApp)</label><input id="reg-tel" placeholder="(11) 99999-9999" /></div>
       <button class="btn btn-primary" onclick="cadastrarSelf()">Criar meu cadastro →</button>
       <button class="btn btn-secondary" onclick="goScreen('screen-login')">← Voltar</button>
       <p style="font-size:12px;color:var(--text-hint);text-align:center;margin-top:8px;">Após o cadastro, você já pode acessar o sistema.</p>
@@ -308,6 +311,8 @@ function goScreen(id) {
 }
 
 function sair() {
+  localStorage.removeItem('ef_nome');
+  localStorage.removeItem('ef_apto');
   usuario = null;
   goScreen('screen-login');
 }
@@ -329,6 +334,18 @@ function entrar() {
   const nome = document.getElementById('l-nome').value.trim();
   const apto = document.getElementById('l-apto').value.trim();
   if (!nome || !apto) { toast('⚠️ Preencha nome e apartamento'); return; }
+  const lembrar = document.getElementById('l-lembrar').checked;
+  if (lembrar) {
+    localStorage.setItem('ef_nome', nome);
+    localStorage.setItem('ef_apto', apto);
+  } else {
+    localStorage.removeItem('ef_nome');
+    localStorage.removeItem('ef_apto');
+  }
+  abrirComoMorador(nome, apto);
+}
+
+function abrirComoMorador(nome, apto) {
   usuario = { nome, apto };
   document.getElementById('m-titulo').textContent = 'Olá, ' + nome.split(' ')[0] + '!';
   document.getElementById('m-sub').textContent = 'Apartamento ' + apto;
@@ -337,20 +354,28 @@ function entrar() {
   iniciarListenerEntregas();
 }
 
+// Auto-login se lembrado
+window.addEventListener('DOMContentLoaded', () => {
+  const nome = localStorage.getItem('ef_nome');
+  const apto = localStorage.getItem('ef_apto');
+  if (nome && apto) {
+    abrirComoMorador(nome, apto);
+  }
+});
+
 // ============================================================
 // CADASTRO SELF (morador se cadastra)
 // ============================================================
 async function cadastrarSelf() {
   const nome = document.getElementById("reg-nome").value.trim();
   const apto = document.getElementById("reg-apto").value.trim();
-  const tel = document.getElementById("reg-tel").value.trim();
   if (!nome || !apto) { toast("⚠️ Preencha nome e apartamento"); return; }
   try {
-    await db.collection("moradores").add({ nome, apto, tel, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
-    toast("✅ Cadastro realizado! Agora faça seu login.");
-    document.getElementById("l-nome").value = nome;
-    document.getElementById("l-apto").value = apto;
-    goScreen("screen-login");
+    await db.collection("moradores").add({ nome, apto, criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+    toast("✅ Cadastro realizado! Entrando...");
+    localStorage.setItem('ef_nome', nome);
+    localStorage.setItem('ef_apto', apto);
+    abrirComoMorador(nome, apto);
   } catch(e) { console.error(e); toast("Erro ao cadastrar. Verifique o Firebase."); }
 }
 
